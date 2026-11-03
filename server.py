@@ -106,4 +106,4 @@ async def ws_handler(request):
 
 async def index(request): return web.FileResponse(os.path.join(ROOT,'index.html'))
 app=web.Application(); app.router.add_get('/',index); app.router.add_get('/ws',ws_handler)
-if __name__=='__main__': web.run_app(app,host='0.0.0.0',port=8000)
+if __name__=='__main__': web.run_app(app, host='0.0.0.0', port=int(os.environ.get('PORT', 8000)))
