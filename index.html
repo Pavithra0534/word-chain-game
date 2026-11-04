@@ -138,6 +138,17 @@ select option{background:#11182b}
 .player.out{opacity:.4}
 .player small{display:block;color:var(--muted);font-size:10px}
 .score{font-weight:900;color:var(--gold);white-space:nowrap}
+.challenge-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:14px}
+.challenge-card{background:#080f20;border:1px solid var(--line);border-radius:12px;padding:13px}
+.challenge-card h4{margin:0 0 6px;font-size:12px;color:var(--cyan);letter-spacing:.5px}
+.challenge-card p{margin:0;color:var(--muted);font-size:12px}
+.challenge-card .progress{height:7px;background:#202c47;border-radius:8px;overflow:hidden;margin-top:9px}
+.challenge-card .progress span{display:block;height:100%;background:linear-gradient(90deg,var(--cyan),var(--purple));width:0;transition:width .2s}
+.power-actions{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.power-actions button{padding:8px 10px;font-size:11px}
+.mission-secret{color:var(--gold)!important}
+.championship-list{display:grid;gap:6px;margin-top:10px}
+.championship-row{display:flex;justify-content:space-between;background:#080f20;padding:8px 10px;border-radius:8px;font-size:12px}
 .feed{margin-top:16px}
 .feedlist{max-height:250px;overflow:auto;display:grid;gap:7px}
 .feeditem{
@@ -309,6 +320,18 @@ select option{background:#11182b}
           <div class="turnnotice" id="turnNotice">Waiting for your turn…</div>
         </div>
 
+        <div class="panel" style="margin-top:14px">
+          <div class="row"><h3>🧭 QUEST CONTROL</h3><span class="pill" id="expeditionStage">STAGE 1</span></div>
+          <div class="challenge-grid">
+            <div class="challenge-card"><h4>🧭 WORD EXPEDITION</h4><p id="expeditionText">Complete five valid words to advance each stage.</p><div class="progress"><span id="expeditionProgress"></span></div></div>
+            <div class="challenge-card"><h4>🃏 SECRET MISSION</h4><p class="mission-secret" id="missionText">Your personal mission appears here.</p></div>
+            <div class="challenge-card"><h4>⚡ CHAOS EVENT</h4><p id="chaosText">Random events can change the rules.</p></div>
+            <div class="challenge-card"><h4>👾 FINAL BOSS</h4><p id="bossText">The team boss challenge unlocks after 12 valid words.</p><div class="progress"><span id="bossProgress"></span></div></div>
+          </div>
+          <div class="challenge-card" style="margin-top:10px"><h4>🛡️ YOUR POWER-UPS</h4><p id="powerupText">Power-ups earned during the match appear here.</p><div class="power-actions" id="powerupActions"></div></div>
+          <div class="challenge-card" style="margin-top:10px"><h4>🏆 CHAMPIONSHIP LEADERBOARD</h4><p id="championshipText">Live scores update as everyone plays.</p><div id="championshipList" class="championship-list"></div></div>
+        </div>
+
         <div class="panel feed">
           <div class="row">
             <h3>WORD HISTORY</h3>
@@ -477,6 +500,11 @@ function startGame() {
   }
 }
 
+function usePowerup(power) {
+  if (!socket || socket.readyState !== WebSocket.OPEN) return;
+  socket.send(JSON.stringify({action:'powerup', power:power}));
+}
+
 function playWord() {
   const word = byId('word').value.trim();
 
@@ -584,6 +612,50 @@ function render() {
   }
 
   byId('statusMsg').textContent = state.message || '';
+
+  const mission = state.my_mission;
+  byId('missionText').textContent = mission
+    ? mission.title + ': ' + mission.description + ' (+' + mission.bonus + ' pts)'
+    : 'Mission information is not available yet.';
+  const wordsPlayed = (state.words || []).length;
+  const stage = Math.floor(wordsPlayed / 5) + 1;
+  const stageProgress = wordsPlayed % 5;
+  byId('expeditionStage').textContent = 'STAGE ' + stage;
+  byId('expeditionText').textContent = stageProgress + ' / 5 valid words toward the next stage (' + wordsPlayed + ' total).';
+  byId('expeditionProgress').style.width = (stageProgress * 20) + '%';
+
+  byId('chaosText').textContent = state.chaos_event
+    ? state.chaos_event.title + ': ' + state.chaos_event.description
+    : 'No active event. A random event may trigger every four valid words.';
+  byId('bossText').textContent = state.boss_active
+    ? 'BOSS ACTIVE — ' + state.boss_progress + ' / ' + state.boss_goal + ' team words completed. Use words with at least 6 letters!'
+    : 'Unlocks after 12 valid words. The team must complete ' + state.boss_goal + ' long words.';
+  byId('bossProgress').style.width = state.boss_active
+    ? Math.min(100, state.boss_progress / Math.max(1, state.boss_goal) * 100) + '%'
+    : '0%';
+
+  const powers = state.my_powerups || [];
+  const powerNames = {shield:'Shield', double:'Double Points', time:'Time Boost'};
+  byId('powerupText').textContent = powers.length
+    ? 'You have ' + powers.length + ' power-up(s). Choose one to activate it.'
+    : 'No power-ups yet. A random power-up is awarded every third valid word in the room.';
+  byId('powerupActions').innerHTML = powers.map(power => {
+    const usable = power !== 'time' || canPlay;
+    return '<button class="btn secondary" ' + (usable ? '' : 'disabled') +
+      ' onclick="usePowerup(\'' + power + '\')">USE ' +
+      escapeHTML(powerNames[power] || power).toUpperCase() + '</button>';
+  }).join('') || '<span class="notice">No power-ups to use yet.</span>';
+
+  const standings = state.championship || [];
+  byId('championshipText').textContent = state.status === 'finished'
+    ? 'Match complete — final scores and winner are shown below.'
+    : 'Live leaderboard — rankings can change until the match ends.';
+  byId('championshipList').innerHTML = (state.status === 'finished' && standings.length)
+    ? standings.map(entry => '<div class="championship-row"><span>#' + entry.rank + ' ' +
+      escapeHTML(entry.name) + '</span><b>' + entry.score + ' pts</b></div>').join('')
+    : [...players].sort((a,b) => b.score - a.score).map((entry,index) =>
+      '<div class="championship-row"><span>#' + (index+1) + ' ' + escapeHTML(entry.name) +
+      '</span><b>' + entry.score + ' pts</b></div>').join('');
 
   byId('players').innerHTML = players.map(player => {
     const isCurrent = player.id === current &&
