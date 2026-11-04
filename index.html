@@ -352,6 +352,7 @@ select option{background:#11182b}
       <div class="eyebrow">ARENA COMPLETE</div>
       <h2 id="winner">WINNER!</h2>
       <p id="finalMessage" class="hint"></p>
+      <div id="finalStandings" class="championship-list"></div>
       <button class="btn" onclick="location.reload()">PLAY AGAIN</button>
     </div>
   </section>
@@ -577,8 +578,15 @@ function render() {
 
     byId('finalMessage').textContent =
       state.mode === 'timed'
-        ? 'Final scores are shown in the player list.'
-        : state.message;
+        ? 'Time is up! The player with the highest score wins. Final standings are below.'
+        : (state.message || 'The match is complete. Final standings are below.');
+
+    const finalStandings = state.championship || [];
+    byId('finalStandings').innerHTML = finalStandings.length
+      ? finalStandings.map(entry => '<div class="championship-row"><span>#' +
+          entry.rank + ' ' + escapeHTML(entry.name) + '</span><b>' +
+          entry.score + ' pts</b></div>').join('')
+      : '<div class="notice">Final standings are not available.</div>';
   }
 
   const currentWord = state.current_word || 'COMPUTER';
