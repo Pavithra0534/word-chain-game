@@ -289,7 +289,9 @@ def next_turn(room):
         return
 
     if len(alive) == 1 and not room["boss_active"]:
+        survivor = alive[0]
         finish_game(room, "The last player standing wins!")
+        room["winner"] = survivor["name"]
         return
 
     ids = list(room["players"].keys())
@@ -373,11 +375,11 @@ def clear_chaos(room):
 def after_valid_word(room):
     if room["chaos_event"]:
         room["chaos_remaining"] -= 1
-
         if room["chaos_remaining"] <= 0:
             clear_chaos(room)
 
-    if len(room["words"]) % 4 == 0:
+    # Start a new event only when no event is already active.
+    if not room["chaos_event"] and len(room["words"]) % 4 == 0:
         activate_chaos(room)
 
     if len(room["words"]) >= 12 and not room["boss_active"]:
@@ -385,7 +387,6 @@ def after_valid_word(room):
         room["boss_progress"] = 0
         room["boss_goal"] = 5
         room["min_length"] = 6
-
         room["message"] = (
             "FINAL BOSS CHALLENGE! Complete five valid words "
             "of at least six letters!"
