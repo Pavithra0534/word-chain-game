@@ -402,10 +402,9 @@ function connect() {
       return;
     }
 
-    socket = new WebSocket(
-      (location.protocol === 'https:' ? 'wss://' : 'ws://') +
-      location.host + '/ws'
-    );
+   socket = new WebSocket(
+  'wss://word-chain-game-3.onrender.com/ws'
+);
 
     socket.onopen = () => resolve();
 
